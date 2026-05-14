@@ -1,2 +1,20 @@
 <Solution>
+  <Folder Name="/src/">
+    <Project Path="src/HouseMaintenance.AI/HouseMaintenance.AI.csproj" />
+    <Project Path="src/HouseMaintenance.API/HouseMaintenance.API.csproj" />
+    <Project Path="src/HouseMaintenance.AppHost/HouseMaintenance.AppHost.csproj" />
+    <Project Path="src/HouseMaintenance.Application/HouseMaintenance.Application.csproj" />
+    <Project Path="src/HouseMaintenance.Core/HouseMaintenance.Core.csproj" />
+    <Project Path="src/HouseMaintenance.Infra/HouseMaintenance.Infra.csproj" />
+    <Project Path="src/HouseMaintenance.ServiceDefaults/HouseMaintenance.ServiceDefaults.csproj" />
+  </Folder>
+  <Folder Name="/src/HouseMaintenance.Web/">
+    <Project Path="src/HouseMaintenance.Web/HouseMaintenance.Web.Client/HouseMaintenance.Web.Client.csproj" />
+    <Project Path="src/HouseMaintenance.Web/HouseMaintenance.Web/HouseMaintenance.Web.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/HouseMaintenance.API.Tests/HouseMaintenance.API.Tests.csproj" />
+    <Project Path="tests/HouseMaintenance.Application.Tests/HouseMaintenance.Application.Tests.csproj" />
+    <Project Path="tests/HouseMaintenance.Web.Tests/HouseMaintenance.Web.Tests.csproj" />
+  </Folder>
 </Solution>

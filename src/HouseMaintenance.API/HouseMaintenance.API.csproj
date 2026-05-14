@@ -1,0 +1,21 @@
+<Project Sdk="Microsoft.NET.Sdk.Web">
+
+  <PropertyGroup>
+    <TargetFramework>net10.0</TargetFramework>
+    <Nullable>enable</Nullable>
+    <ImplicitUsings>enable</ImplicitUsings>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="Microsoft.AspNetCore.OpenApi" Version="10.0.8" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <ProjectReference Include="..\HouseMaintenance.Application\HouseMaintenance.Application.csproj" />
+    <ProjectReference Include="..\HouseMaintenance.Infra\HouseMaintenance.Infra.csproj" />
+    <ProjectReference Include="..\HouseMaintenance.AI\HouseMaintenance.AI.csproj" />
+    <ProjectReference Include="..\HouseMaintenance.Core\HouseMaintenance.Core.csproj" />
+    <ProjectReference Include="..\HouseMaintenance.ServiceDefaults\HouseMaintenance.ServiceDefaults.csproj" />
+  </ItemGroup>
+
+</Project>

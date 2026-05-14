@@ -1,0 +1,19 @@
+@HouseMaintenance.API_HostAddress = http://localhost:5111
+
+POST {{HouseMaintenance.API_HostAddress}}/api/maintenance-plans
+Content-Type: application/json
+
+{
+  "tasks": [
+    "Trocar lâmpada do corredor",
+    "Fixar quadro da sala",
+    "Limpar ralo do banheiro"
+  ]
+}
+
+###
+
+GET {{HouseMaintenance.API_HostAddress}}/api/maintenance-plans/history
+Accept: application/json
+
+###
