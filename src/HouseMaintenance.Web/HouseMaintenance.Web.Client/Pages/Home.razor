@@ -1,0 +1,435 @@
+@page "/"
+
+@inject IMaintenancePlannerClient PlannerClient
+
+<PageTitle>House Maintenance | Mission Control</PageTitle>
+
+<section class="panel panel-cut hero-panel">
+    <div class="eyebrow-row">
+        <span class="hud-chip">May The Fourth 2026</span>
+        <span class="hud-chip hud-chip-gold">Blazor WASM + AI</span>
+        <span class="hud-chip hud-chip-green">Mission Ready</span>
+    </div>
+
+    <div class="hero-grid">
+        <div>
+            <p class="hero-kicker">Mission Control // House Maintenance</p>
+            <h1>Organize pequenos reparos como uma missão no hangar da Rebelião.</h1>
+            <p class="hero-copy">
+                Liste os reparos, envie para a IA e receba uma sequência que reaproveita o mesmo kit de ferramentas,
+                reduz deslocamentos e deixa menos bagunça pelo caminho.
+            </p>
+
+            <div class="stats-grid">
+                <article class="stat-card">
+                    <span class="stat-label">KITS</span>
+                    <strong>@(CurrentPlan?.ToolGroups.Count ?? 0)</strong>
+                </article>
+                <article class="stat-card">
+                    <span class="stat-label">PASSOS</span>
+                    <strong>@(CurrentPlan?.TaskCount ?? QueuedTasks.Count)</strong>
+                </article>
+                <article class="stat-card">
+                    <span class="stat-label">MINUTOS</span>
+                    <strong>@(CurrentPlan?.EstimatedMinutes ?? 0)</strong>
+                </article>
+            </div>
+        </div>
+
+        <aside class="panel inner-panel mission-briefing">
+            <h2>Briefing da missão</h2>
+            <p class="panel-copy">
+                A IA recebe cada reparo com uma dica de kit, calcula a ordem mais limpa e devolve grupos
+                operacionais para você executar sem ficar pulando de ferramenta em ferramenta.
+            </p>
+            <ul class="briefing-list">
+                <li>Saída estruturada com grupos, passos e notas de segurança</li>
+                <li>Histórico recente salvo em SQLite</li>
+                <li>Visual inspirado em HUD sci-fi e cockpit Star Wars</li>
+            </ul>
+        </aside>
+    </div>
+</section>
+
+<div class="workspace-grid">
+    <section class="panel panel-cut composer-panel">
+        <header class="panel-header">
+            <div>
+                <p class="section-label">Fila de reparos</p>
+                <h2>Monte a missão</h2>
+            </div>
+            <span class="hud-chip hud-chip-red">Prioridade doméstica</span>
+        </header>
+
+        <div class="composer-row">
+            <input class="mission-input"
+                   placeholder="Ex.: Trocar lâmpada da lavanderia"
+                   @bind="NewTask"
+                   @bind:event="oninput"
+                   @onkeydown="HandleComposerKeyDown" />
+            <button class="ghost-button" @onclick="AddTask">Adicionar</button>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(LocalValidationMessage))
+        {
+            <p class="form-feedback">@LocalValidationMessage</p>
+        }
+
+        <div class="suggestion-row">
+            @foreach (var suggestion in SuggestedTasks)
+            {
+                <button class="suggestion-chip" @onclick="() => AddSuggestion(suggestion)">@suggestion</button>
+            }
+        </div>
+
+        <div class="queued-task-list">
+            @foreach (var item in QueuedTasks.Select((task, index) => new { task, index }))
+            {
+                <div class="queued-task">
+                    <span class="queued-order">@($"{item.index + 1:00}")</span>
+                    <span class="queued-label">@item.task</span>
+                    <button class="chip-dismiss" @onclick="() => RemoveTask(item.task)">x</button>
+                </div>
+            }
+        </div>
+
+        <div class="action-row">
+            <button class="mission-button" @onclick="GeneratePlanAsync" disabled="@IsSubmitting">
+                @(IsSubmitting ? "Calculando rota..." : "Gerar plano da missão")
+            </button>
+            <button class="ghost-button" @onclick="ResetToExampleTasks" disabled="@IsSubmitting">
+                Restaurar demo
+            </button>
+        </div>
+
+        @if (!string.IsNullOrWhiteSpace(GenerationErrorMessage))
+        {
+            <p class="panel-copy text-error">@GenerationErrorMessage</p>
+        }
+    </section>
+
+    <section class="panel panel-cut history-panel">
+        <header class="panel-header">
+            <div>
+                <p class="section-label">Banco de missões</p>
+                <h2>Histórico recente</h2>
+            </div>
+            @if (IsHistoryLoading)
+            {
+                <span class="hud-chip">Sincronizando</span>
+            }
+        </header>
+
+        @if (!string.IsNullOrWhiteSpace(HistoryErrorMessage))
+        {
+            <p class="panel-copy text-error">@HistoryErrorMessage</p>
+        }
+        else if (RecentMissions.Count == 0)
+        {
+            <p class="panel-copy">Nenhuma missão registrada ainda. Gere a primeira sequência para popular o painel.</p>
+        }
+        else
+        {
+            <div class="history-list">
+                @foreach (var mission in RecentMissions)
+                {
+                    <button class="history-card @(mission.MissionId == SelectedMissionId ? "history-card-active" : null)"
+                            @onclick="() => LoadMissionAsync(mission.MissionId)">
+                        <div class="history-topline">
+                            <span class="hud-chip">@mission.TaskCount reparos</span>
+                            <span class="history-timestamp">@mission.CreatedAtUtc.ToLocalTime().ToString("dd/MM HH:mm")</span>
+                        </div>
+                        <strong>@mission.MissionTitle</strong>
+                        <p>@mission.Summary</p>
+                        <span class="history-footnote">@mission.ToolkitSwitches troca(s) de kit</span>
+                    </button>
+                }
+            </div>
+        }
+    </section>
+</div>
+
+@if (CurrentPlan is not null)
+{
+    <section class="panel panel-cut plan-panel">
+        <header class="plan-header">
+            <div>
+                <p class="section-label">Sequência recomendada</p>
+                <h2>@CurrentPlan.MissionTitle</h2>
+                <p class="panel-copy">@CurrentPlan.Summary</p>
+            </div>
+
+            <div class="plan-meta-grid">
+                <div class="meta-pill">
+                    <span class="stat-label">CRIADA</span>
+                    <strong>@CurrentPlan.CreatedAtUtc.ToLocalTime().ToString("dd/MM/yyyy HH:mm")</strong>
+                </div>
+                <div class="meta-pill">
+                    <span class="stat-label">REPAROS</span>
+                    <strong>@CurrentPlan.TaskCount</strong>
+                </div>
+                <div class="meta-pill">
+                    <span class="stat-label">MINUTOS</span>
+                    <strong>@CurrentPlan.EstimatedMinutes</strong>
+                </div>
+            </div>
+        </header>
+
+        <div class="summary-grid">
+            <article class="panel inner-panel">
+                <h3>Racional tático</h3>
+                <p class="panel-copy">@CurrentPlan.StrategicRationale</p>
+            </article>
+            <article class="panel inner-panel">
+                <h3>Notas de segurança</h3>
+                <ul class="safety-list">
+                    @foreach (var note in CurrentPlan.SafetyNotes)
+                    {
+                        <li>@note</li>
+                    }
+                </ul>
+            </article>
+        </div>
+
+        <div class="group-grid">
+            @foreach (var group in CurrentPlan.ToolGroups)
+            {
+                <article class="tool-group-card @GetToolkitTone(group.Toolkit)">
+                    <div class="group-header">
+                        <div>
+                            <span class="stat-label">KIT @($"{group.Order:00}")</span>
+                            <h3>@group.Toolkit</h3>
+                        </div>
+                        <span class="hud-chip">@group.EstimatedMinutes min</span>
+                    </div>
+
+                    <p class="panel-copy">@group.ToolkitReason</p>
+
+                    <ol class="step-list">
+                        @foreach (var step in group.Steps)
+                        {
+                            <li class="step-card">
+                                <div class="step-index">@($"{step.Order:00}")</div>
+                                <div>
+                                    <strong>@step.TaskName</strong>
+                                    <p>@step.WhyNow</p>
+                                </div>
+                                <span class="step-time">@step.EstimatedMinutes min</span>
+                            </li>
+                        }
+                    </ol>
+                </article>
+            }
+        </div>
+    </section>
+}
+else
+{
+    <section class="panel panel-cut mission-empty-state">
+        <div class="eyebrow-row">
+            <span class="hud-chip">Aguardando execução</span>
+        </div>
+        <h2>Nenhum plano gerado ainda.</h2>
+        <p class="panel-copy">
+            Use os reparos de exemplo ou monte sua própria lista para ver a IA agrupar a missão por kit de ferramentas.
+        </p>
+    </section>
+}
+
+@code {
+    private static readonly string[] SuggestedTasks =
+    [
+        "Trocar lâmpada do corredor",
+        "Fixar quadro da sala",
+        "Limpar ralo do banheiro",
+        "Ajustar tomada da cozinha",
+        "Furar suporte da lavanderia",
+        "Desengordurar trilho da janela"
+    ];
+
+    private List<string> QueuedTasks { get; set; } =
+    [
+        "Trocar lâmpada do corredor",
+        "Fixar quadro da sala",
+        "Limpar ralo do banheiro"
+    ];
+
+    private List<RecentMissionResponse> RecentMissions { get; set; } = [];
+    private MaintenancePlanResponse? CurrentPlan { get; set; }
+    private Guid? SelectedMissionId { get; set; }
+    private string NewTask { get; set; } = string.Empty;
+    private string? LocalValidationMessage { get; set; }
+    private string? GenerationErrorMessage { get; set; }
+    private string? HistoryErrorMessage { get; set; }
+    private bool IsSubmitting { get; set; }
+    private bool IsHistoryLoading { get; set; }
+
+    protected override async Task OnInitializedAsync()
+    {
+        await LoadHistoryAsync();
+    }
+
+    private void AddTask()
+    {
+        var candidate = NewTask.Trim();
+
+        if (string.IsNullOrWhiteSpace(candidate))
+        {
+            LocalValidationMessage = "Digite um reparo antes de adicionar à missão.";
+            return;
+        }
+
+        if (QueuedTasks.Contains(candidate, StringComparer.OrdinalIgnoreCase))
+        {
+            LocalValidationMessage = "Esse reparo já está na fila.";
+            NewTask = string.Empty;
+            return;
+        }
+
+        QueuedTasks.Add(candidate);
+        NewTask = string.Empty;
+        LocalValidationMessage = null;
+    }
+
+    private void AddSuggestion(string suggestion)
+    {
+        if (QueuedTasks.Contains(suggestion, StringComparer.OrdinalIgnoreCase))
+        {
+            return;
+        }
+
+        QueuedTasks.Add(suggestion);
+        LocalValidationMessage = null;
+    }
+
+    private void RemoveTask(string task)
+    {
+        QueuedTasks.Remove(task);
+    }
+
+    private void ResetToExampleTasks()
+    {
+        QueuedTasks =
+        [
+            "Trocar lâmpada do corredor",
+            "Fixar quadro da sala",
+            "Limpar ralo do banheiro"
+        ];
+        LocalValidationMessage = null;
+        GenerationErrorMessage = null;
+    }
+
+    private void HandleComposerKeyDown(KeyboardEventArgs args)
+    {
+        if (args.Key == "Enter")
+        {
+            AddTask();
+        }
+    }
+
+    private async Task GeneratePlanAsync()
+    {
+        if (QueuedTasks.Count == 0)
+        {
+            LocalValidationMessage = "Adicione pelo menos um reparo para gerar a missão.";
+            return;
+        }
+
+        IsSubmitting = true;
+        GenerationErrorMessage = null;
+        LocalValidationMessage = null;
+
+        try
+        {
+            CurrentPlan = await PlannerClient.GeneratePlanAsync(QueuedTasks);
+            SelectedMissionId = CurrentPlan.MissionId;
+            await LoadHistoryAsync();
+        }
+        catch (MaintenancePlannerClientException exception)
+        {
+            GenerationErrorMessage = exception.Message;
+        }
+        catch (HttpRequestException)
+        {
+            GenerationErrorMessage = "Não foi possível falar com o backend da missão agora.";
+        }
+        finally
+        {
+            IsSubmitting = false;
+        }
+    }
+
+    private async Task LoadHistoryAsync()
+    {
+        IsHistoryLoading = true;
+        HistoryErrorMessage = null;
+
+        try
+        {
+            RecentMissions = (await PlannerClient.GetRecentMissionsAsync()).ToList();
+        }
+        catch (MaintenancePlannerClientException exception)
+        {
+            HistoryErrorMessage = exception.Message;
+        }
+        catch (HttpRequestException)
+        {
+            HistoryErrorMessage = "O histórico não pôde ser carregado neste momento.";
+        }
+        finally
+        {
+            IsHistoryLoading = false;
+        }
+    }
+
+    private async Task LoadMissionAsync(Guid missionId)
+    {
+        GenerationErrorMessage = null;
+
+        try
+        {
+            CurrentPlan = await PlannerClient.GetMissionAsync(missionId);
+            SelectedMissionId = CurrentPlan.MissionId;
+        }
+        catch (MaintenancePlannerClientException exception)
+        {
+            GenerationErrorMessage = exception.Message;
+        }
+        catch (HttpRequestException)
+        {
+            GenerationErrorMessage = "Não foi possível recuperar a missão selecionada.";
+        }
+    }
+
+    private static string GetToolkitTone(string toolkit)
+    {
+        var normalized = toolkit.ToLowerInvariant();
+
+        if (normalized.Contains("elétrico") || normalized.Contains("eletrico"))
+        {
+            return "tone-electric";
+        }
+
+        if (normalized.Contains("fixação") || normalized.Contains("fixacao"))
+        {
+            return "tone-fixation";
+        }
+
+        if (normalized.Contains("hidráulico") || normalized.Contains("hidraulico"))
+        {
+            return "tone-water";
+        }
+
+        if (normalized.Contains("limpeza"))
+        {
+            return "tone-clean";
+        }
+
+        if (normalized.Contains("acabamento"))
+        {
+            return "tone-finish";
+        }
+
+        return "tone-general";
+    }
+}

@@ -1,0 +1,34 @@
+@page "/Error"
+@using System.Diagnostics
+@layout HouseMaintenance.Web.Client.Layout.MainLayout
+
+<PageTitle>Falha no hangar</PageTitle>
+
+<section class="panel panel-cut mission-empty-state">
+    <div class="eyebrow-row">
+        <span class="hud-chip hud-chip-red">ALERTA</span>
+        <span class="hud-chip">Erro de superfície</span>
+    </div>
+    <h1>O painel perdeu contato com a missão.</h1>
+    <p class="panel-copy">
+        A interface encontrou uma falha inesperada. Recarregue a aplicação e tente novamente.
+    </p>
+
+    @if (ShowRequestId)
+    {
+        <p class="mission-metadata">Trace ID: <strong>@RequestId</strong></p>
+    }
+</section>
+
+@code {
+    [CascadingParameter]
+    private HttpContext? HttpContext { get; set; }
+
+    private string? RequestId { get; set; }
+    private bool ShowRequestId => !string.IsNullOrWhiteSpace(RequestId);
+
+    protected override void OnInitialized()
+    {
+        RequestId = Activity.Current?.Id ?? HttpContext?.TraceIdentifier;
+    }
+}
