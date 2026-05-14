@@ -2,45 +2,154 @@
 
 ## 🚀 May The Fourth 2026 - Desafio 5
 
-Oi, eu sou o [seu nome aqui] e este é o espaço onde compartilho minha jornada de aprendizado durante o desafio **May The Fourth 2026**, realizado pelo [balta.io](https://balta.io). 👻
+Aplicação fullstack em **.NET 10** para organizar pequenos reparos domésticos com ajuda de IA. O usuário informa tarefas como trocar lâmpada, fixar quadro e limpar ralo, e o sistema gera uma ordem de execução que reaproveita o mesmo kit de ferramentas em sequência, reduzindo trocas de contexto e bagunça.
 
-Aqui você vai encontrar projetos, exercícios e códigos que estou desenvolvendo durante o desafio.
+## O que foi implementado
 
-### Sobre este desafio
-Você lista pequenos reparos (trocar lâmpada, fixar quadro, limpar ralo) e a IA organiza a ordem de execução para que você use o mesmo kit de ferramentas em sequência, minimizando a bagunça.
+- **API ASP.NET Core** com endpoint para gerar o plano e endpoint para consultar histórico
+- **Camada de aplicação** com normalização, deduplicação, dicas de toolkit e validação do contrato da IA
+- **Camada de IA** com **Microsoft Agent Framework + OpenAI** retornando saída estruturada
+- **Persistência em SQLite** com EF Core para salvar missões e planos gerados
+- **Frontend em Blazor WebAssembly** com temática sci-fi/Star Wars inspirada no `design.md`
+- **Aspire 13.3.1** com AppHost para orquestrar API e frontend
+- **Testes** de aplicação, API e interface Blazor
 
-#### Nível 1 - Console Application
-- Projeto do tipo Console App simples
-- Separar os agentes em markdowns na pasta agentes
-- Criar os agentes (Arquivos .cs) separados
+## Estrutura da solução
 
-#### Nível 2 - API
-- Estruturar um projeto de IA
-  - Api, Ai, Core, Infra, Applicattion?
-- Expor um endpoint que recebe a entrada do usuário e retorna a receita
+| Projeto | Responsabilidade |
+| --- | --- |
+| `HouseMaintenance.API` | Endpoints HTTP, composição da aplicação e tratamento de erros |
+| `HouseMaintenance.Application` | Regras de negócio, preparação das tarefas e validação do plano |
+| `HouseMaintenance.Core` | Entidades, DTOs e contratos |
+| `HouseMaintenance.Infra` | `DbContext`, SQLite e repositório |
+| `HouseMaintenance.AI` | Prompt e agente do Microsoft Agent Framework com OpenAI |
+| `HouseMaintenance.Web` | Host ASP.NET Core do frontend |
+| `HouseMaintenance.Web.Client` | UI Blazor WebAssembly |
+| `HouseMaintenance.AppHost` | Orquestração com Aspire |
+| `HouseMaintenance.ServiceDefaults` | Telemetria, health checks e service discovery do Aspire |
 
-#### Nível 2 - Fullstack + IA
-- Estruturar um projeto de IA
-  - Api, Ai, Core, Infra, Applicattion?, Frontend (Blazor Wasm)
-- Expor um endpoint que recebe a entrada do usuário e retorna a receita
+## Stack
 
-Neste processo eu aprendi:
-* ✅ 
+- .NET 10
+- ASP.NET Core Minimal API
+- Blazor WebAssembly
+- Microsoft Agent Framework (`Microsoft.Agents.AI.OpenAI`)
+- OpenAI
+- Entity Framework Core + SQLite
+- Aspire 13.3.1
+- xUnit + bUnit
 
-## Bagde
-<img src="https://baltaio.blob.core.windows.net/static/images/v4/challenges/may-the-fourth-2026/rewards/house-maintenance/image.png" width="200" />
+## Design
 
-## Problema
---
+O frontend segue os tokens e princípios descritos em `design.md`, reinterpretando o visual **NASA-punk** para um painel com clima de **cockpit Star Wars**:
 
-## Sobre o ay The Fourth 2026
-O desafio **ay The Fourth 2026** consiste em implementar agentes e inteligência artificial em cenários reais, resolvendo problemas do dia-a-dia com Microsoft Agent Framework, C# e .NET.
+- painéis rígidos e chanfrados
+- badges/HUD com tipografia técnica
+- contraste entre azul profundo, dourado, verde e vermelho
+- foco em painel de missão, não em feed
 
-### Imersão - Microsoft Agents Framework
-https://www.youtube.com/watch?v=XkgjeBurtFw
+## Como executar
 
-### Curso - Microsoft Agents Framework
-https://balta.io/cursos/fundamentos-do-microsoft-agent-framework
+### 1. Configurar a chave da OpenAI
 
-### Veja meu progresso no desafio
-[Incluir link para o repositório central]
+Defina a variável de ambiente abaixo antes de gerar planos:
+
+```powershell
+$env:OpenAI__ApiKey = "sua-chave"
+```
+
+Opcionalmente, troque o modelo:
+
+```powershell
+$env:OpenAI__Model = "gpt-5.4-mini"
+```
+
+Também é possível ajustar o timeout de rede do cliente OpenAI:
+
+```powershell
+$env:OpenAI__TimeoutSeconds = "90"
+```
+
+Se o plano estiver levando mais tempo para ser gerado, o host Web também aceita aumentar o timeout do proxy same-origin para a API:
+
+```powershell
+$env:Api__TimeoutSeconds = "180"
+```
+
+> Sem `OpenAI__ApiKey`, a aplicação sobe normalmente, mas a geração do plano retorna erro informando a configuração ausente.
+
+### 2. Executar com Aspire
+
+```powershell
+dotnet run --project .\src\HouseMaintenance.AppHost\
+```
+
+### 3. Executar manualmente
+
+API:
+
+```powershell
+dotnet run --project .\src\HouseMaintenance.API\
+```
+
+Frontend:
+
+```powershell
+dotnet run --project .\src\HouseMaintenance.Web\HouseMaintenance.Web\
+```
+
+## Endpoints principais
+
+### Gerar plano
+
+`POST /api/maintenance-plans`
+
+```json
+{
+  "tasks": [
+    "Trocar lâmpada do corredor",
+    "Fixar quadro da sala",
+    "Limpar ralo do banheiro"
+  ]
+}
+```
+
+### Histórico
+
+`GET /api/maintenance-plans/history?take=6`
+
+### Detalhe da missão
+
+`GET /api/maintenance-plans/{missionId}`
+
+## Testes
+
+Executar build:
+
+```powershell
+dotnet build HouseMaintenance.slnx --tl:off -v minimal
+```
+
+Executar testes:
+
+```powershell
+dotnet test HouseMaintenance.slnx --tl:off -v minimal
+```
+
+## Estratégia de commits sugerida
+
+Para manter a entrega organizada, a solução foi estruturada para permitir commits por fatia funcional:
+
+1. bootstrap da solução e Aspire
+2. domínio e aplicação
+3. agente IA
+4. persistência
+5. API
+6. frontend
+7. testes e documentação
+
+## Observações de arquitetura
+
+- `HouseMaintenance.AI` **não concentra regras de negócio**; ele expõe apenas o agente e o prompt.
+- A camada `HouseMaintenance.Application` decide como preparar os reparos, validar a resposta e persistir o resultado.
+- O frontend consome o backend por um **proxy same-origin** no host Web, enquanto o AppHost usa service discovery do Aspire para conectar os projetos.
